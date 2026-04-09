@@ -13,11 +13,11 @@ MVGL.NET is a crude .NET command-line tool and library for working with several 
 
 It can unpack and repack `MDB1` archives, extract and create `AFS2` archives, convert `EXPA` table data to and from CSV, and encrypt or decrypt DSCS save files.
 
-## Credit and provenance
+## Credit
 
 This project is based on the original [**MVGLTools / DSCSTools**](https://github.com/SydMontague/MVGLTools) work by [**SydMontague**](https://github.com/SydMontague).
 
-The original project documentation and license have been kept in this repository as:
+The original project documentation and license are as below:
 
 - [README_old.md](https://github.com/SydMontague/MVGLTools/README.md)
 - [LICENSE_old](https://github.com/SydMontague/MVGLTools/LICENSE)
