@@ -48,9 +48,9 @@ If you are familiar with the old syntax, check the usage section below before as
 
 ## Requirements
 
-- .NET 10 SDK
+- .NET 8 SDK
 
-This project currently targets `net10.0`.
+This project currently targets `net8.0`.
 
 ## Build
 
