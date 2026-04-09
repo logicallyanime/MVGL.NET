@@ -1,4 +1,6 @@
 # MVGL.NET
+[![NuGet](https://shields.io/packages/MVGLTools.svg)](https://nuget.org/packages/MVGLTools/)
+
 
 MVGL.NET is a crude .NET command-line tool and library for working with several Media.Vision game formats used by:
 
