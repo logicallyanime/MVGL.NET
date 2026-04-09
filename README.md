@@ -1,6 +1,6 @@
-# MVGLTools
+# MVGL.NET
 
-MVGLTools is a .NET command-line tool and library for working with several Media.Vision game formats used by:
+MVGL.NET is a crude .NET command-line tool and library for working with several Media.Vision game formats used by:
 
 - Digimon Story: Cyber Sleuth (DSCS)
 - Digimon Story: Time Stranger (DSTS)
@@ -10,12 +10,12 @@ It can unpack and repack `MDB1` archives, extract and create `AFS2` archives, co
 
 ## Credit and provenance
 
-This project is based on the original **MVGLTools / DSCSTools** work by **SydMontague**.
+This project is based on the original [**MVGLTools / DSCSTools**](https://github.com/SydMontague/MVGLTools) work by [**SydMontague**](https://github.com/SydMontague).
 
 The original project documentation and license have been kept in this repository as:
 
-- [README_old.md](README_old.md)
-- [LICENSE_old](LICENSE_old)
+- [README_old.md](https://github.com/SydMontague/MVGLTools/README.md)
+- [LICENSE_old](https://github.com/SydMontague/MVGLTools/LICENSE)
 
 This README is an updated adaptation of that older documentation for the current C#/.NET version in this repository. The original author deserves the core format research and the original implementation credit.
 
