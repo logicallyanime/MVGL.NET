@@ -83,13 +83,17 @@ internal static class Program
 
     private static int RunMdb1(string[] args)
     {
-        RequireLength(args, 1, "mdb1 <extract|extract-file|pack> ...");
+        RequireLength(args, 1, "mdb1 <extract|extract-file|pack|add-file-stream|add-folder-stream|benchmark-add|benchmark-folder-add> ...");
         var action = args[0].ToLowerInvariant();
         return action switch
         {
             "extract" => RunMdb1Extract(args[1..]),
             "extract-file" => RunMdb1ExtractFile(args[1..]),
             "pack" => RunMdb1Pack(args[1..]),
+            "add-file-stream" => RunMdb1AddFileStream(args[1..]),
+            "add-folder-stream" => RunMdb1AddFolderStream(args[1..]),
+            "benchmark-add" => RunMdb1BenchmarkAdd(args[1..]),
+            "benchmark-folder-add" => RunMdb1BenchmarkAddFolder(args[1..]),
             _ => Fail($"Unknown MDB1 action '{args[0]}'.")
         };
     }
@@ -124,6 +128,62 @@ internal static class Program
         return 0;
     }
 
+    private static int RunMdb1AddFileStream(string[] args)
+    {
+        if (args.Length < 3 || args.Length > 5)
+        {
+            throw new ArgumentException("Usage: mdb1 add-file-stream <profile> [compress-mode] <archive> <source-file> [file-in-archive]");
+        }
+
+        var profile = ParseMdbProfile(args[0]);
+        var (mode, valueIndex) = ParseOptionalCompressMode(args, 1);
+        var archiveEntryPath = args.Length - valueIndex >= 3 ? args[valueIndex + 2] : null;
+        profile.AddFileStreaming(args[valueIndex], args[valueIndex + 1], archiveEntryPath, mode);
+        return 0;
+    }
+
+    private static int RunMdb1BenchmarkAdd(string[] args)
+    {
+        if (args.Length < 3 || args.Length > 5)
+        {
+            throw new ArgumentException("Usage: mdb1 benchmark-add <profile> [compress-mode] <archive> <source-file> [file-in-archive]");
+        }
+
+        var profile = ParseMdbProfile(args[0]);
+        var (mode, valueIndex) = ParseOptionalCompressMode(args, 1);
+        var archiveEntryPath = args.Length - valueIndex >= 3 ? args[valueIndex + 2] : null;
+        profile.BenchmarkAdd(args[valueIndex], args[valueIndex + 1], archiveEntryPath, mode);
+        return 0;
+    }
+
+    private static int RunMdb1AddFolderStream(string[] args)
+    {
+        if (args.Length < 3 || args.Length > 5)
+        {
+            throw new ArgumentException("Usage: mdb1 add-folder-stream <profile> [compress-mode] <archive> <source-folder> [archive-root]");
+        }
+
+        var profile = ParseMdbProfile(args[0]);
+        var (mode, valueIndex) = ParseOptionalCompressMode(args, 1);
+        var archiveRoot = args.Length - valueIndex >= 3 ? args[valueIndex + 2] : null;
+        profile.AddFolderStreaming(args[valueIndex], args[valueIndex + 1], archiveRoot, mode);
+        return 0;
+    }
+
+    private static int RunMdb1BenchmarkAddFolder(string[] args)
+    {
+        if (args.Length < 3 || args.Length > 5)
+        {
+            throw new ArgumentException("Usage: mdb1 benchmark-folder-add <profile> [compress-mode] <archive> <source-folder> [archive-root]");
+        }
+
+        var profile = ParseMdbProfile(args[0]);
+        var (mode, valueIndex) = ParseOptionalCompressMode(args, 1);
+        var archiveRoot = args.Length - valueIndex >= 3 ? args[valueIndex + 2] : null;
+        profile.BenchmarkAddFolder(args[valueIndex], args[valueIndex + 1], archiveRoot, mode);
+        return 0;
+    }
+
     private static ExpaProfileRunner ParseExpaProfile(string value) => value.ToLowerInvariant() switch
     {
         "dscs" => new ExpaProfileRunner(
@@ -143,19 +203,35 @@ internal static class Program
         "dscs" => new MdbProfileRunner(
             static (source, target) => Mdb1<DscsMdbProfile>.Open(source).Extract(target),
             static (source, file, target) => WriteOutputFile(target, Mdb1<DscsMdbProfile>.Open(source).ReadFileData(file)),
-            static (source, target, mode) => Mdb1<DscsMdbProfile>.Create().AddFolder(source).Write(target, mode)),
+            static (source, target, mode) => Mdb1<DscsMdbProfile>.Create().AddFolder(source).Write(target, mode),
+            static (archive, source, file, mode) => Mdb1<DscsMdbProfile>.AddFileStreaming(archive, source, file, mode),
+            static (archive, source, root, mode) => Mdb1<DscsMdbProfile>.AddFolderStreaming(archive, source, root, mode),
+            static (archive, source, file, mode) => Mdb1Benchmarks.BenchmarkAdd<DscsMdbProfile>(archive, source, file, mode),
+            static (archive, source, root, mode) => Mdb1Benchmarks.BenchmarkAddFolder<DscsMdbProfile>(archive, source, root, mode)),
         "dscs-nocrypt" => new MdbProfileRunner(
             static (source, target) => Mdb1<DscsNoCryptMdbProfile>.Open(source).Extract(target),
             static (source, file, target) => WriteOutputFile(target, Mdb1<DscsNoCryptMdbProfile>.Open(source).ReadFileData(file)),
-            static (source, target, mode) => Mdb1<DscsNoCryptMdbProfile>.Create().AddFolder(source).Write(target, mode)),
+            static (source, target, mode) => Mdb1<DscsNoCryptMdbProfile>.Create().AddFolder(source).Write(target, mode),
+            static (archive, source, file, mode) => Mdb1<DscsNoCryptMdbProfile>.AddFileStreaming(archive, source, file, mode),
+            static (archive, source, root, mode) => Mdb1<DscsNoCryptMdbProfile>.AddFolderStreaming(archive, source, root, mode),
+            static (archive, source, file, mode) => Mdb1Benchmarks.BenchmarkAdd<DscsNoCryptMdbProfile>(archive, source, file, mode),
+            static (archive, source, root, mode) => Mdb1Benchmarks.BenchmarkAddFolder<DscsNoCryptMdbProfile>(archive, source, root, mode)),
         "dsts" => new MdbProfileRunner(
             static (source, target) => Mdb1<DstsMdbProfile>.Open(source).Extract(target),
             static (source, file, target) => WriteOutputFile(target, Mdb1<DstsMdbProfile>.Open(source).ReadFileData(file)),
-            static (source, target, mode) => Mdb1<DstsMdbProfile>.Create().AddFolder(source).Write(target, mode)),
+            static (source, target, mode) => Mdb1<DstsMdbProfile>.Create().AddFolder(source).Write(target, mode),
+            static (archive, source, file, mode) => Mdb1<DstsMdbProfile>.AddFileStreaming(archive, source, file, mode),
+            static (archive, source, root, mode) => Mdb1<DstsMdbProfile>.AddFolderStreaming(archive, source, root, mode),
+            static (archive, source, file, mode) => Mdb1Benchmarks.BenchmarkAdd<DstsMdbProfile>(archive, source, file, mode),
+            static (archive, source, root, mode) => Mdb1Benchmarks.BenchmarkAddFolder<DstsMdbProfile>(archive, source, root, mode)),
         "thl" => new MdbProfileRunner(
             static (source, target) => Mdb1<ThlMdbProfile>.Open(source).Extract(target),
             static (source, file, target) => WriteOutputFile(target, Mdb1<ThlMdbProfile>.Open(source).ReadFileData(file)),
-            static (source, target, mode) => Mdb1<ThlMdbProfile>.Create().AddFolder(source).Write(target, mode)),
+            static (source, target, mode) => Mdb1<ThlMdbProfile>.Create().AddFolder(source).Write(target, mode),
+            static (archive, source, file, mode) => Mdb1<ThlMdbProfile>.AddFileStreaming(archive, source, file, mode),
+            static (archive, source, root, mode) => Mdb1<ThlMdbProfile>.AddFolderStreaming(archive, source, root, mode),
+            static (archive, source, file, mode) => Mdb1Benchmarks.BenchmarkAdd<ThlMdbProfile>(archive, source, file, mode),
+            static (archive, source, root, mode) => Mdb1Benchmarks.BenchmarkAddFolder<ThlMdbProfile>(archive, source, root, mode)),
         _ => throw new ArgumentException($"Unknown MDB1 profile '{value}'.")
     };
 
@@ -166,6 +242,35 @@ internal static class Program
         "advanced" => CompressMode.Advanced,
         _ => throw new ArgumentException($"Unknown compress mode '{value}'.")
     };
+
+    private static (CompressMode Mode, int ValueIndex) ParseOptionalCompressMode(string[] args, int index)
+    {
+        if (args.Length > index && TryParseCompressMode(args[index], out var mode))
+        {
+            return (mode, index + 1);
+        }
+
+        return (CompressMode.Normal, index);
+    }
+
+    private static bool TryParseCompressMode(string value, out CompressMode mode)
+    {
+        switch (value.ToLowerInvariant())
+        {
+            case "none":
+                mode = CompressMode.None;
+                return true;
+            case "normal":
+                mode = CompressMode.Normal;
+                return true;
+            case "advanced":
+                mode = CompressMode.Advanced;
+                return true;
+            default:
+                mode = default;
+                return false;
+        }
+    }
 
     private static void RequireLength(string[] args, int minLength, string usage)
     {
@@ -214,9 +319,20 @@ internal static class Program
         Console.WriteLine("  mdb1 extract <dscs|dscs-nocrypt|dsts|thl> <source> <target>");
         Console.WriteLine("  mdb1 extract-file <dscs|dscs-nocrypt|dsts|thl> <source> <file-in-archive> <target>");
         Console.WriteLine("  mdb1 pack <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <source> <target>");
+        Console.WriteLine("  mdb1 add-file-stream <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <archive> <source-file> [file-in-archive]");
+        Console.WriteLine("  mdb1 add-folder-stream <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <archive> <source-folder> [archive-root]");
+        Console.WriteLine("  mdb1 benchmark-add <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <archive> <source-file> [file-in-archive]");
+        Console.WriteLine("  mdb1 benchmark-folder-add <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <archive> <source-folder> [archive-root]");
         Console.WriteLine("    Default compress mode: normal");
     }
 
     private readonly record struct ExpaProfileRunner(Action<string, string> Read, Action<string, string> Write);
-    private readonly record struct MdbProfileRunner(Action<string, string> Extract, Action<string, string, string> ExtractSingle, Action<string, string, CompressMode> Pack);
+    private readonly record struct MdbProfileRunner(
+        Action<string, string> Extract,
+        Action<string, string, string> ExtractSingle,
+        Action<string, string, CompressMode> Pack,
+        Action<string, string, string?, CompressMode> AddFileStreaming,
+        Action<string, string, string?, CompressMode> AddFolderStreaming,
+        Action<string, string, string?, CompressMode> BenchmarkAdd,
+        Action<string, string, string?, CompressMode> BenchmarkAddFolder);
 }

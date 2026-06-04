@@ -163,6 +163,36 @@ public sealed class Mdb1<TProfile>
     public static Mdb1<TProfile> Read(string path) => new Mdb1<TProfile>().Load(path);
 
     /// <summary>
+    /// Adds or replaces a file in an archive on disk without fully loading the archive into memory.
+    /// </summary>
+    /// <param name="archivePath">The archive file to rewrite.</param>
+    /// <param name="sourcePath">The source file to add.</param>
+    /// <param name="entryPath">The destination path inside the archive, or <see langword="null"/> to use the source file name.</param>
+    /// <param name="compress">The compression mode to apply to the added or replaced file.</param>
+    public static void AddFileStreaming(string archivePath, string sourcePath, string? entryPath = null, CompressMode compress = CompressMode.Normal)
+        => Mdb1Streaming.AddFile<TProfile>(archivePath, sourcePath, entryPath, compress);
+
+    /// <summary>
+    /// Replaces an existing file in an archive on disk without fully loading the archive into memory.
+    /// </summary>
+    /// <param name="archivePath">The archive file to rewrite.</param>
+    /// <param name="sourcePath">The replacement source file.</param>
+    /// <param name="entryPath">The existing path inside the archive.</param>
+    /// <param name="compress">The compression mode to apply to the replacement file.</param>
+    public static void UpdateFileStreaming(string archivePath, string sourcePath, string entryPath, CompressMode compress = CompressMode.Normal)
+        => Mdb1Streaming.UpdateFile<TProfile>(archivePath, sourcePath, entryPath, compress);
+
+    /// <summary>
+    /// Adds or replaces all files from a folder in an archive on disk without fully loading the archive into memory.
+    /// </summary>
+    /// <param name="archivePath">The archive file to rewrite.</param>
+    /// <param name="sourceFolder">The source folder to import.</param>
+    /// <param name="archiveRoot">An optional root folder inside the archive.</param>
+    /// <param name="compress">The compression mode to apply to imported files.</param>
+    public static void AddFolderStreaming(string archivePath, string sourceFolder, string? archiveRoot = null, CompressMode compress = CompressMode.Normal)
+        => Mdb1Streaming.AddFolder<TProfile>(archivePath, sourceFolder, archiveRoot, compress);
+
+    /// <summary>
     /// Loads archive contents from disk into the current instance.
     /// </summary>
     /// <param name="path">The archive path to read.</param>
@@ -454,6 +484,8 @@ internal static class Mdb1Format
     internal readonly record struct Header(ulong FileEntryCount, ulong FileNameCount, ulong DataEntryCount, ulong DataStart, ulong TotalSize, uint MagicValue);
     internal readonly record struct TreeEntry(ulong CompareBit, ulong DataId, ulong Left, ulong Right);
     internal readonly record struct DataEntry(ulong Offset, ulong FullSize, ulong CompressedSize);
+    internal readonly record struct IndexedArchiveFile(string ArchivePath, int DataIndex);
+    internal readonly record struct IndexedArchive(Header Header, IReadOnlyList<IndexedArchiveFile> Files, IReadOnlyList<DataEntry> DataEntries);
     private readonly record struct TreeName(string Name, string ArchivePath);
     private readonly record struct TreeNode(ulong CompareBit, ulong Left, ulong Right, TreeName Name);
     private readonly record struct CompressionResult(ulong OriginalSize, uint Crc, byte[] Data);
@@ -542,6 +574,59 @@ internal static class Mdb1Format
 
         Helpers.Log($"[MDB1] Indexed {files.Count} files.");
         return files;
+    }
+
+    internal static IndexedArchive ReadArchiveIndex(string path, IMdbProfile profile)
+    {
+        Helpers.Log($"[MDB1] Indexing {Path.GetFileName(path)}...");
+
+        using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 0x10000, FileOptions.SequentialScan);
+
+        var header = ReadHeader(input, profile);
+        if (header.MagicValue != Mdb1MagicValue)
+        {
+            throw new InvalidDataException("Given file is not an MVGL archive.");
+        }
+
+        var treeEntries = new List<TreeEntry>(checked((int)header.FileEntryCount));
+        var nameEntries = new List<string>(checked((int)header.FileNameCount));
+        var dataEntries = new List<DataEntry>(checked((int)header.DataEntryCount));
+
+        for (ulong i = 0; i < header.FileEntryCount; i++)
+        {
+            treeEntries.Add(ReadTreeEntry(input, profile));
+        }
+
+        for (ulong i = 0; i < header.FileNameCount; i++)
+        {
+            nameEntries.Add(ReadNameEntry(input, profile));
+        }
+
+        for (ulong i = 0; i < header.DataEntryCount; i++)
+        {
+            dataEntries.Add(ReadDataEntry(input, profile));
+        }
+
+        var files = new List<IndexedArchiveFile>(treeEntries.Count);
+        for (var i = 0; i < treeEntries.Count; i++)
+        {
+            var dataId = treeEntries[i].DataId;
+            if (IsInvalidTreeIndex(profile, dataId))
+            {
+                continue;
+            }
+
+            var archivePath = NormalizeArchivePath(nameEntries[i]);
+            if (string.IsNullOrEmpty(archivePath))
+            {
+                continue;
+            }
+
+            files.Add(new IndexedArchiveFile(archivePath, checked((int)dataId)));
+        }
+
+        Helpers.Log($"[MDB1] Indexed {files.Count} file references.");
+        return new IndexedArchive(header, files, dataEntries);
     }
 
     internal static void WriteArchive(Stream output, IMdbProfile profile, IReadOnlyDictionary<string, byte[]> files, CompressMode compress)
@@ -655,6 +740,121 @@ internal static class Mdb1Format
         }
 
         output.Seek(checked((long)(baseOffset + (long)(dataStart + offset))), SeekOrigin.Begin);
+    }
+
+    internal static ulong WriteArchiveMetadata(Stream output, IMdbProfile profile, IReadOnlyList<string> archivePaths, IReadOnlyDictionary<string, int> fileDataIds, IReadOnlyList<DataEntry> dataEntries)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(archivePaths);
+        ArgumentNullException.ThrowIfNull(fileDataIds);
+        ArgumentNullException.ThrowIfNull(dataEntries);
+
+        if (!output.CanWrite)
+        {
+            throw new ArgumentException("Output stream must be writable.", nameof(output));
+        }
+
+        if (!output.CanSeek)
+        {
+            throw new ArgumentException("Output stream must be seekable.", nameof(output));
+        }
+
+        var orderedFiles = archivePaths
+            .Select(static archivePath => new ArchiveSource(NormalizeArchivePath(archivePath), []))
+            .ToArray();
+
+        Helpers.Log("[Pack] Generating File Tree...");
+        var tree = GenerateTree(orderedFiles, profile);
+
+        var fileCount = orderedFiles.Length;
+        var headerSize = profile.Use64BitEntries ? 0x20 : 0x14;
+        var treeEntrySize = (profile.Use64BitEntries ? 0x10 : 0x08) * (fileCount + 1);
+        var nameEntrySize = (ExtensionLength + profile.NameLength) * (fileCount + 1);
+        var dataEntrySize = (profile.Use64BitEntries ? 0x18 : 0x0C) * dataEntries.Count;
+        var dataStart = (ulong)(headerSize + treeEntrySize + nameEntrySize + dataEntrySize);
+
+        var treeEntries = new List<TreeEntry>(fileCount + 1)
+        {
+            new TreeEntry(Invalid, Invalid, 0, fileCount == 0 ? 0UL : 1UL),
+        };
+        var nameEntries = new List<string>(fileCount + 1)
+        {
+            string.Empty,
+        };
+
+        foreach (var node in tree)
+        {
+            if (node.CompareBit == Invalid)
+            {
+                continue;
+            }
+
+            var archivePath = NormalizeArchivePath(node.Name.ArchivePath);
+            treeEntries.Add(new TreeEntry(node.CompareBit, (ulong)fileDataIds[archivePath], node.Left, node.Right));
+            nameEntries.Add(node.Name.Name);
+        }
+
+        var baseOffset = output.Position;
+        var totalStoredSize = dataEntries.Aggregate(0UL, static (total, entry) => total + entry.CompressedSize);
+        output.SetLength(baseOffset);
+        output.Seek(baseOffset, SeekOrigin.Begin);
+
+        WriteHeader(output, profile, new Header((ulong)treeEntries.Count, (ulong)nameEntries.Count, (ulong)dataEntries.Count, dataStart, dataStart + totalStoredSize, Mdb1MagicValue));
+        foreach (var treeEntry in treeEntries)
+        {
+            WriteTreeEntry(output, profile, treeEntry);
+        }
+
+        foreach (var nameEntry in nameEntries)
+        {
+            WriteNameEntry(output, profile, nameEntry);
+        }
+
+        foreach (var dataEntry in dataEntries)
+        {
+            WriteDataEntry(output, profile, dataEntry);
+        }
+
+        output.Seek(checked((long)(baseOffset + (long)dataStart)), SeekOrigin.Begin);
+        return dataStart;
+    }
+
+    internal static void CopyStoredPayload(FileStream input, Stream output, IMdbProfile profile, long sourceOffset, ulong size)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(profile);
+
+        input.Seek(sourceOffset, SeekOrigin.Begin);
+
+        var buffer = new byte[0x10000];
+        ulong processed = 0;
+        while (processed < size)
+        {
+            var remaining = size - processed;
+            var chunkSize = (int)Math.Min((ulong)buffer.Length, remaining);
+            var bytesRead = input.Read(buffer, 0, chunkSize);
+            if (bytesRead == 0)
+            {
+                throw new EndOfStreamException();
+            }
+
+            if (profile.Crypted)
+            {
+                var absoluteSourceOffset = sourceOffset + (long)processed;
+                var transformed = buffer.AsSpan(0, bytesRead).ToArray();
+                CryptArray(transformed, absoluteSourceOffset);
+                CryptArray(transformed, output.Position);
+                output.Write(transformed, 0, bytesRead);
+            }
+            else
+            {
+                output.Write(buffer, 0, bytesRead);
+            }
+
+            processed += (ulong)bytesRead;
+        }
     }
 
     private static byte[] ReadFile(FileStream input, ulong dataStart, DataEntry entry, IMdbProfile profile)
