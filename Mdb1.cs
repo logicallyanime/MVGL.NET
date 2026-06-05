@@ -481,15 +481,15 @@ internal static class Mdb1Format
     private const int ExtensionLength = 4;
     private const ulong Invalid = ulong.MaxValue;
 
-    internal readonly record struct Header(ulong FileEntryCount, ulong FileNameCount, ulong DataEntryCount, ulong DataStart, ulong TotalSize, uint MagicValue);
-    internal readonly record struct TreeEntry(ulong CompareBit, ulong DataId, ulong Left, ulong Right);
-    internal readonly record struct DataEntry(ulong Offset, ulong FullSize, ulong CompressedSize);
-    internal readonly record struct IndexedArchiveFile(string ArchivePath, int DataIndex);
-    internal readonly record struct IndexedArchive(Header Header, IReadOnlyList<IndexedArchiveFile> Files, IReadOnlyList<DataEntry> DataEntries);
-    private readonly record struct TreeName(string Name, string ArchivePath);
-    private readonly record struct TreeNode(ulong CompareBit, ulong Left, ulong Right, TreeName Name);
-    private readonly record struct CompressionResult(ulong OriginalSize, uint Crc, byte[] Data);
-    private readonly record struct ArchiveSource(string ArchivePath, byte[] Data);
+    public readonly record struct Header(ulong FileEntryCount, ulong FileNameCount, ulong DataEntryCount, ulong DataStart, ulong TotalSize, uint MagicValue);
+    public readonly record struct TreeEntry(ulong CompareBit, ulong DataId, ulong Left, ulong Right);
+    public readonly record struct DataEntry(ulong Offset, ulong FullSize, ulong CompressedSize);
+    public readonly record struct IndexedArchiveFile(string ArchivePath, int DataIndex);
+    public readonly record struct IndexedArchive(Header Header, IReadOnlyList<IndexedArchiveFile> Files, IReadOnlyList<DataEntry> DataEntries);
+    public readonly record struct TreeName(string Name, string ArchivePath);
+    public readonly record struct TreeNode(ulong CompareBit, ulong Left, ulong Right, TreeName Name);
+    public readonly record struct CompressionResult(ulong OriginalSize, uint Crc, byte[] Data);
+    public readonly record struct ArchiveSource(string ArchivePath, byte[] Data);
     private sealed record QueueEntry(ulong ParentNode, ulong CompareBit, List<TreeName> List, List<TreeName> NodeList, bool IsLeft);
 
     internal static void CryptArray(byte[] array, long offset)
@@ -882,7 +882,7 @@ internal static class Mdb1Format
         return new CompressionResult((ulong)rawData.Length, checksum, compressed);
     }
 
-    private static List<TreeNode> GenerateTree(IReadOnlyList<ArchiveSource> files, IMdbProfile profile)
+    public static List<TreeNode> GenerateTree(IReadOnlyList<ArchiveSource> files, IMdbProfile profile)
     {
         if (files.Count == 0)
         {
@@ -893,6 +893,25 @@ internal static class Mdb1Format
             .Select(file => new TreeName(BuildMdb1Path(file.ArchivePath, profile), file.ArchivePath))
             .ToList();
 
+        return GenerateTreeFromNames(fileNames);
+    }
+    
+    public static List<TreeNode> GenerateTree(IReadOnlyList<string> archivePaths, IMdbProfile profile)
+    {
+        var fileNames = archivePaths
+            .Select(path =>
+            {
+                var normalized = NormalizeArchivePath(path);
+                return new TreeName(BuildMdb1Path(normalized, profile), normalized);
+            })
+            .ToList();
+
+        return GenerateTreeFromNames(fileNames);
+    }
+    
+    
+    
+    private static List<TreeNode> GenerateTreeFromNames(List<TreeName> fileNames){
         var nodes = new List<TreeNode> { new(Invalid, 0, 0, default) };
         var queue = new LinkedList<QueueEntry>();
         queue.AddFirst(new QueueEntry(0, Invalid, fileNames, new List<TreeName>(), false));

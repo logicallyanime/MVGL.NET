@@ -2,6 +2,8 @@
   <PropertyGroup>
     <Authors>LogicallyAnime, SydMontague</Authors>
     <RepositoryUrl>https://github.com/logicallyanime/MVGL.NET</RepositoryUrl>
+    <Version>1.0.1</Version>
+    <PackageId>MVGLTools</PackageId>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <TargetFramework>net8.0</TargetFramework>
