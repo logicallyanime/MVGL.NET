@@ -198,6 +198,7 @@ internal static class Program
         _ => throw new ArgumentException($"Unknown EXPA profile '{value}'.")
     };
 
+    //TODO: Update ProfileReader to support recently added functions?
     private static MdbProfileRunner ParseMdbProfile(string value) => value.ToLowerInvariant() switch
     {
         "dscs" => new MdbProfileRunner(

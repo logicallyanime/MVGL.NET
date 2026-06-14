@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Text;
 
 namespace MVGLTools;
@@ -169,8 +168,13 @@ public sealed class Mdb1<TProfile>
     /// <param name="sourcePath">The source file to add.</param>
     /// <param name="entryPath">The destination path inside the archive, or <see langword="null"/> to use the source file name.</param>
     /// <param name="compress">The compression mode to apply to the added or replaced file.</param>
-    public static void AddFileStreaming(string archivePath, string sourcePath, string? entryPath = null, CompressMode compress = CompressMode.Normal)
-        => Mdb1Streaming.AddFile<TProfile>(archivePath, sourcePath, entryPath, compress);
+    public static void AddFileStreaming(string archivePath, string sourcePath, string? entryPath = null,
+        CompressMode compress = CompressMode.Normal)
+    {
+        var plan = Mdb1ArchivePlanner.CreatePlanFromFile<TProfile>(archivePath, sourcePath, entryPath, compress);
+        Mdb1StreamingWriter.WriteArchiveToDisk<TProfile>(archivePath, plan);
+        
+    }
 
     /// <summary>
     /// Replaces an existing file in an archive on disk without fully loading the archive into memory.
@@ -180,7 +184,10 @@ public sealed class Mdb1<TProfile>
     /// <param name="entryPath">The existing path inside the archive.</param>
     /// <param name="compress">The compression mode to apply to the replacement file.</param>
     public static void UpdateFileStreaming(string archivePath, string sourcePath, string entryPath, CompressMode compress = CompressMode.Normal)
-        => Mdb1Streaming.UpdateFile<TProfile>(archivePath, sourcePath, entryPath, compress);
+    {
+        var plan = Mdb1ArchivePlanner.CreatePlanFromFile<TProfile>(archivePath, sourcePath, entryPath, compress);
+        Mdb1StreamingWriter.WriteArchiveToDisk<TProfile>(archivePath, plan);
+    }
 
     /// <summary>
     /// Adds or replaces all files from a folder in an archive on disk without fully loading the archive into memory.
@@ -190,7 +197,11 @@ public sealed class Mdb1<TProfile>
     /// <param name="archiveRoot">An optional root folder inside the archive.</param>
     /// <param name="compress">The compression mode to apply to imported files.</param>
     public static void AddFolderStreaming(string archivePath, string sourceFolder, string? archiveRoot = null, CompressMode compress = CompressMode.Normal)
-        => Mdb1Streaming.AddFolder<TProfile>(archivePath, sourceFolder, archiveRoot, compress);
+    {
+        var plan = Mdb1ArchivePlanner.CreatePlanFromFolder<TProfile>(archivePath, sourceFolder, archiveRoot, compress);
+        Mdb1StreamingWriter.WriteArchiveToDisk<TProfile>(archivePath, plan);
+        
+    }
 
     /// <summary>
     /// Loads archive contents from disk into the current instance.
@@ -704,7 +715,7 @@ internal static class Mdb1Format
             {
                 dataMap[data.Crc] = dataId;
                 dataEntries.Add(new DataEntry(offset, data.OriginalSize, (ulong)data.Data.Length));
-                output.Seek(checked((long)(baseOffset + (long)dataStart + (long)offset)), SeekOrigin.Begin);
+                output.Seek(checked(baseOffset + (long)dataStart + (long)offset), SeekOrigin.Begin);
                 Helpers.WriteBytes(output, data.Data, profile.Crypted);
                 offset += (ulong)data.Data.Length;
             }
@@ -739,7 +750,7 @@ internal static class Mdb1Format
             WriteDataEntry(output, profile, dataEntry);
         }
 
-        output.Seek(checked((long)(baseOffset + (long)(dataStart + offset))), SeekOrigin.Begin);
+        output.Seek(checked(baseOffset + (long)(dataStart + offset)), SeekOrigin.Begin);
     }
 
     internal static ulong WriteArchiveMetadata(Stream output, IMdbProfile profile, IReadOnlyList<string> archivePaths, IReadOnlyDictionary<string, int> fileDataIds, IReadOnlyList<DataEntry> dataEntries)
@@ -816,7 +827,7 @@ internal static class Mdb1Format
             WriteDataEntry(output, profile, dataEntry);
         }
 
-        output.Seek(checked((long)(baseOffset + (long)dataStart)), SeekOrigin.Begin);
+        output.Seek(checked(baseOffset + (long)dataStart), SeekOrigin.Begin);
         return dataStart;
     }
 
@@ -1050,7 +1061,7 @@ internal static class Mdb1Format
         }
 
         extension = extension.Length > 4 ? extension[..4] : extension;
-        var fileName = Path.ChangeExtension(archivePath, null)!.Replace('/', '\\');
+        var fileName = Path.ChangeExtension(archivePath, null).Replace('/', '\\');
         var extensionPart = extension.PadRight(4, '\0');
         var namePart = fileName.Length > profile.NameLength ? fileName[..profile.NameLength] : fileName;
         return extensionPart + namePart;
