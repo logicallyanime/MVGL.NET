@@ -486,7 +486,7 @@ public sealed class Mdb1<TProfile>
     private static string NormalizeArchivePath(string path) => path.Replace('\\', '/').TrimStart('/');
 }
 
-internal static class Mdb1Format
+public static class Mdb1Format
 {
     internal const uint Mdb1MagicValue = 0x3142444D;
     private const int ExtensionLength = 4;

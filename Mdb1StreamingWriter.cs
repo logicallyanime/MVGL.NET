@@ -1,23 +1,23 @@
 namespace MVGLTools;
 
 
-static class Mdb1ArchivePlanner
+public static class Mdb1ArchivePlanner
 {
     
     private static string GetMutationKey(string path) => $"mutation:{NormalizeArchivePath(path)}";
 
-    internal readonly record struct ArchiveMutation(string SourcePath, string EntryPath);
+    public readonly record struct ArchiveMutation(string SourcePath, string EntryPath);
 
-    internal readonly record struct FileReference(string ArchivePath, string SourceKey, bool IsExisting, int ExistingDataIndex);
+    public readonly record struct FileReference(string ArchivePath, string SourceKey, bool IsExisting, int ExistingDataIndex);
 
-    internal enum PayloadKind
+    public enum PayloadKind
     {
         ExistingArchive,
         SourceFile,
         TempStoredFile,
     }
 
-    internal readonly record struct PreparedDataSource(string Key, string ArchivePath, PayloadKind Kind, string? SourcePath, long SourceOffset, ulong FullSize, ulong StoredSize, ulong Offset)
+    public readonly record struct PreparedDataSource(string Key, string ArchivePath, PayloadKind Kind, string? SourcePath, long SourceOffset, ulong FullSize, ulong StoredSize, ulong Offset)
     {
         public static PreparedDataSource FromExisting(string key, string sourceArchivePath, ulong dataStart, Mdb1Format.DataEntry dataEntry, int dataIndex)
             => new(key, $"existing:{dataIndex}", PayloadKind.ExistingArchive, sourceArchivePath, checked((long)(dataStart + dataEntry.Offset)), dataEntry.FullSize, dataEntry.CompressedSize, 0);
@@ -267,7 +267,7 @@ static class Mdb1ArchivePlanner
     }
 }
 
-class Mdb1ArchivePlan
+public class Mdb1ArchivePlan
 {
     private Mdb1ArchivePlanner.ArchiveMutation[] _archiveMutations { get; set;}
     private string _archivePath { get; set;}
