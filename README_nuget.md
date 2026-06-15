@@ -1,11 +1,6 @@
 # MVGL.NET
-[![NuGet](https://img.shields.io/nuget/v/MVGLTools)](https://nuget.org/packages/MVGLTools/) ![NuGet Downloads](https://img.shields.io/nuget/dt/MVGLTools)
 
-
-
-
-
-MVGL.NET is a crude .NET command-line tool and library for working with several Media.Vision game formats used by:
+MVGL.NET is a crude .NET Library for working with several Media.Vision game formats used by:
 
 - Digimon Story: Cyber Sleuth (DSCS)
 - Digimon Story: Time Stranger (DSTS)
@@ -13,11 +8,11 @@ MVGL.NET is a crude .NET command-line tool and library for working with several 
 
 It can unpack and repack `MDB1` archives, extract and create `AFS2` archives, convert `EXPA` table data to and from CSV, and encrypt or decrypt DSCS save files.
 
-## Credit
+## Credit and provenance
 
 This project is based on the original [**MVGLTools / DSCSTools**](https://github.com/SydMontague/MVGLTools) work by [**SydMontague**](https://github.com/SydMontague).
 
-The original project documentation and license are as below:
+The original project documentation and license have been kept in this repository as:
 
 - [README_old.md](https://github.com/SydMontague/MVGLTools/README.md)
 - [LICENSE_old](https://github.com/SydMontague/MVGLTools/LICENSE)
@@ -57,127 +52,6 @@ If you are familiar with the old syntax, check the usage section below before as
 
 This project currently targets `net8.0`.
 
-## Build
-
-From the project folder, build with the .NET SDK:
-
-- `dotnet build .\MVGLTools.csproj`
-
-You can run the tool either through `dotnet run` or by invoking the built executable.
-
-## Usage
-
-General form:
-
-- `MVGLTools <command> ...`
-
-When running through the SDK during development:
-
-- `dotnet run -- <command> ...`
-
-### Commands
-
-#### MDB1
-
-- `mdb1 extract <dscs|dscs-nocrypt|dsts|thl> <source> <target>`
-- `mdb1 extract-file <dscs|dscs-nocrypt|dsts|thl> <source> <file-in-archive> <target>`
-- `mdb1 pack <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <source> <target>`
-- `mdb1 add-file-stream <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <archive> <source-file> [file-in-archive]`
-- `mdb1 add-folder-stream <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <archive> <source-folder> [archive-root]`
-- `mdb1 benchmark-add <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <archive> <source-file> [file-in-archive]`
-- `mdb1 benchmark-folder-add <dscs|dscs-nocrypt|dsts|thl> [none|normal|advanced] <archive> <source-folder> [archive-root]`
-
-Notes:
-
-- default compression mode is `normal`
-- use `dscs` for encrypted DSCS archives
-- use `dscs-nocrypt` for already decrypted DSCS assets / console-style data
-
-Examples:
-
-- `dotnet run -- mdb1 extract dscs game.mvgl extracted`
-- `dotnet run -- mdb1 extract-file dsts data.mvgl rom/chr/hero.bin hero.bin`
-- `dotnet run -- mdb1 pack thl advanced unpacked rebuilt.mvgl`
-- `dotnet run -- mdb1 add-file-stream dscs-nocrypt normal game.mvgl patch.bin patches/patch.bin`
-- `dotnet run -- mdb1 add-folder-stream dscs game.mvgl patch_folder patches`
-- `dotnet run -- mdb1 benchmark-add dscs game.mvgl patch.bin patches/patch.bin`
-- `dotnet run -- mdb1 benchmark-folder-add dscs-nocrypt game.mvgl patch_folder patches`
-
-#### EXPA
-
-- `expa export-csv <dscs|dsts|thl> <source> <target>`
-- `expa import-csv <dscs|dsts|thl> <source> <target>`
-
-Examples:
-
-- `dotnet run -- expa export-csv dscs field_data.expa csv_out`
-- `dotnet run -- expa import-csv dsts csv_out rebuilt.expa`
-
-#### AFS2
-
-- `afs2 extract <source> <target>`
-- `afs2 pack <source> <target>`
-
-The extracted audio files are written as `.hca` files.
-
-#### Save files
-
-- `save decrypt <source> <target>`
-- `save encrypt <source> <target>`
-
-These commands are intended for **DSCS save files**.
-
-## EXPA structures
-
-For `EXPA` operations, the tool can load external structure definitions from a `structures` folder placed relative to the current working directory.
-
-Current profile folders used by this build are:
-
-- `structures/dscs`
-- `structures/dsts`
-- `structures/tlh`
-
-Each folder may contain a `structure.json` file that maps file path regex patterns to structure definition files, following the same general idea described in [README_old.md](README_old.md).
-
-Behavior summary:
-
-- for DSCS, external structure files are typically needed
-- for DSTS and THL, the file may already contain structure information, but external names can still improve output
-- CSV headers also carry type information in this version, so imported CSV can provide structure hints on its own
-
-## Library usage
-
-The project can also be referenced from another .NET project instead of only being used as a CLI.
-
-The public API lives in the `MVGLTools` namespace. Main entry points include:
-
-- `Mdb1<TProfile>`
-- `Afs2`
-- `Expa`
-- `SaveFile`
-
-Examples of available profiles include:
-
-- `DscsMdbProfile`
-- `DscsNoCryptMdbProfile`
-- `DstsMdbProfile`
-- `ThlMdbProfile`
-- `DscsExpaProfile`
-- `DstsExpaProfile`
-- `ThlExpaProfile`
-
-### Referencing the project
-
-If this repository is part of the same solution, add a normal project reference from your own `.csproj`.
-
-This project is also set up so its output type can be overridden. If you specifically want to build it as a library assembly, you can do so by setting `MVGLToolsOutputType=Library` at build time.
-
-Typical example:
-
-- `dotnet build .\MVGLTools.csproj -p:MVGLToolsOutputType=Library`
-
-After that, reference the produced assembly or add a project reference and use the `MVGLTools` namespace in your code.
-
 ### API overview
 
 #### `Mdb1<TProfile>`
@@ -209,9 +83,6 @@ Useful write/edit methods:
 - `UpdateFile(sourcePath, archivePath)` replaces an existing archive entry from disk
 - `UpdateFile(archivePath, data)` replaces an existing archive entry from bytes
 - `RemoveFile(archivePath)` / `DeleteFile(archivePath)` removes an entry
-- `AddFileStreaming(archivePath, sourcePath, entryPath, compressMode)` rewrites an archive on disk without fully loading all files into memory
-- `AddFolderStreaming(archivePath, sourceFolder, archiveRoot, compressMode)` streaming-imports a whole folder into an existing archive on disk
-- `UpdateFileStreaming(archivePath, sourcePath, entryPath, compressMode)` streaming-replaces an existing file on disk
 - `Write(target, compressMode)` writes the archive to disk
 - `Write(stream, compressMode)` writes to a stream
 - `ToStream(compressMode)` builds the archive into a `MemoryStream`
@@ -268,30 +139,6 @@ archive.UpdateFile("ui_chara_icon_1819.img", "images/ui_chara_icon_1819.img");
 archive.Write("DSDBP.steam.mvgl", CompressMode.Normal);
 ```
 
-### Example: stream-add one file without loading the full archive
-
-```csharp
-using MVGLTools;
-
-Mdb1<DscsMdbProfile>.AddFileStreaming(
-  "DSDBP.steam.mvgl",
-  "ui_chara_icon_1819.img",
-  "images/ui_chara_icon_1819.img",
-  CompressMode.Normal);
-```
-
-### Example: stream-add a folder without loading the full archive
-
-```csharp
-using MVGLTools;
-
-Mdb1<DscsMdbProfile>.AddFolderStreaming(
-  "DSDBP.steam.mvgl",
-  "patch_folder",
-  "patches",
-  CompressMode.Normal);
-```
-
 ### Example: convert EXPA to and from CSV
 
 ```csharp
@@ -319,8 +166,6 @@ SaveFile.Encrypt("slot_0001.dec.bin", "slot_0001.enc.bin");
 ### Notes for library consumers
 
 - `Mdb1<TProfile>` keeps archive contents in memory, so very large archives may require substantial RAM and may take time to fully load.
-- `AddFileStreaming()`, `AddFolderStreaming()`, and `UpdateFileStreaming()` still rebuild the archive, but they reuse stored payloads directly from disk so they avoid loading every file into RAM first.
-- `benchmark-add` and `benchmark-folder-add` compare the legacy in-memory path against the streaming rewrite path and validate extracted results before reporting timings.
 - `Extract()` writes all files to disk, while `GetFileData()` / `ReadFileData()` let you access a single file as bytes.
 - `AddFile()`, `UpdateFile()`, `RemoveFile()`, and `ContainsFile()` support programmatic archive editing workflows.
 - `EXPA` structure lookups still depend on the working directory if you rely on external `structures/...` folders. This may be addressed in the future.

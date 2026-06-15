@@ -2,6 +2,8 @@
   <PropertyGroup>
     <Authors>LogicallyAnime, SydMontague</Authors>
     <RepositoryUrl>https://github.com/logicallyanime/MVGL.NET</RepositoryUrl>
+    <Version>1.0.1</Version>
+    <PackageId>MVGLTools</PackageId>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <TargetFramework>net8.0</TargetFramework>
@@ -12,6 +14,11 @@
     <Nullable>enable</Nullable>
     <LangVersion>preview</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Configurations>Debug;Release;Release-DSCS;Release-DSTS</Configurations>
+    <Platforms>AnyCPU</Platforms>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release-DSCS' ">
+    <Optimize Condition=" '$(Optimize)' == '' ">true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
